@@ -3,7 +3,7 @@ package spamdestroyer;
 import java.io.File;
 
 /**
- * Created by spencer on 27/02/17.
+ * Email data structure
  */
 public class Email {
     private File file;

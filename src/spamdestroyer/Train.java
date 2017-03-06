@@ -3,80 +3,61 @@ package spamdestroyer;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Map;
 
 /**
- * Created by spencer on 27/02/17.
+ * The main functionality of this class is to train the algorithm to
+ * identify the probability of 'spamliness' for each word based on a provided
+ * spam/ham data set.
  */
 public class Train {
 
     private int spamFileCount = 0;
     private int hamFileCount = 0;
 
-    private HashMap<String,Integer> spamFreq = new HashMap<String,Integer>();
-    private HashMap<String,Integer> hamFreq = new HashMap<String,Integer>();
+    private HashMap<String,Integer> spamFreq = new HashMap<>();
+    private HashMap<String,Integer> hamFreq = new HashMap<>();
 
     private File mainDir = null;
-
     private String output = null;
 
     public Train (File dir) {
         this.mainDir = dir;
     }
-    
+
+    /*
+     * Creates a bag of words model from a given training set of spam, and counts the
+     * occurrence of each word in spam files.
+     */
     public String frequencySpam()
     {
-        File spamdir = new File(this.mainDir + "/train/spam");
-
+        File spamdir = new File(mainDir + "/train/spam");
         File[] spamdirlist = spamdir.listFiles();
 
         long start_time = System.currentTimeMillis();
 
-
         if(spamdirlist != null) {
-
-            for (File file : spamdirlist) {
+            for (File file : spamdirlist)
                 try {
-                    FileInputStream is = new FileInputStream(file);
-                    InputStreamReader sr = new InputStreamReader(is,"UTF-8");
-                    BufferedReader br = new BufferedReader(sr);
-
-                    HashMap<String,Integer> bagOfWords = new HashMap<String,Integer>();
-
-                    String line;
-
-                    while((line = br.readLine()) != null) {
-                        for (String word : line.split(" ")) {
-                            word = word.toLowerCase();
-                            if (bagOfWords.get(word) == null) {
-                                bagOfWords.put(word, 1);
-                            }
-
-                        }
-                    }
+                    // Create the bag of words
+                    HashMap<String,Integer> bagOfWords = bagOfWords(file);
 
                     for (String key : bagOfWords.keySet()) {
-                        if(this.spamFreq.get(key) == null) {
-                            this.spamFreq.put(key,1);
+                        if (spamFreq.get(key) == null) {
+                            spamFreq.put(key, 1);
                         } else {
-                            this.spamFreq.put(key,this.spamFreq.get(key)+1);
+                            spamFreq.put(key, spamFreq.get(key) + 1);
                         }
                     }
 
-                    bagOfWords = null;
-
                     spamFileCount++;
-
-                    br.close();
 
                 } catch (IOException e) {
                     e.printStackTrace();
                     return "SPAM DIRECTORY NOT FOUND! Please make sure the directory structure is correct.";
                 }
-            }
         } else {
             System.out.println("Directory not found.");
-            this.spamFreq = null;
+            spamFreq = null;
             return "SPAM DIRECTORY NOT FOUND! Please make sure the directory structure is correct.";
         }
 
@@ -90,54 +71,38 @@ public class Train {
     }
 
 
+    /*
+     * Creates a bag of words model from a given training set of 'ham'(non-spam), and counts the
+     * occurrence of each word in 'ham' files.
+     */
     public String frequencyHam()
     {
-        ArrayList<File> dirList = new ArrayList<File>();
+        ArrayList<File> dirList = new ArrayList<>();
 
-        dirList.add(0, new File(this.mainDir + "/train/ham"));
-        dirList.add(1, new File(this.mainDir + "/train/ham2"));
+        dirList.add(0, new File(mainDir + "/train/ham"));
+        dirList.add(1, new File(mainDir + "/train/ham2"));
 
         long start_time = System.currentTimeMillis();
 
         for(File dir : dirList ) {
-
             File[] hamDirList = dir.listFiles();
 
             if (hamDirList != null) {
-
                 for (File file : hamDirList) {
                     try {
-                        FileInputStream is = new FileInputStream(file);
-                        InputStreamReader sr = new InputStreamReader(is, "UTF-8");
-                        BufferedReader br = new BufferedReader(sr);
+                        // Create the bag of words
+                        HashMap<String,Integer> bagOfWords = bagOfWords(file);
 
-                        HashMap<String, Integer> bagOfWords = new HashMap<String, Integer>();
-
-                        String line;
-
-                        while ((line = br.readLine()) != null) {
-                            for (String word : line.split(" ")) {
-                                word = word.toLowerCase();
-                                if (bagOfWords.get(word) == null) {
-                                    bagOfWords.put(word, 1);
-                                }
-
-                            }
-                        }
-
+                        // Add or update occurrence of word in global ham map
                         for (String key : bagOfWords.keySet()) {
-                            if (this.hamFreq.get(key) == null) {
-                                this.hamFreq.put(key, 1);
+                            if (hamFreq.get(key) == null) {
+                                hamFreq.put(key, 1);
                             } else {
-                                this.hamFreq.put(key, this.hamFreq.get(key) + 1);
+                                hamFreq.put(key, hamFreq.get(key) + 1);
                             }
                         }
 
                         hamFileCount++;
-
-                        bagOfWords = null;
-
-                        br.close();
 
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -145,7 +110,8 @@ public class Train {
                 }
             } else {
                 System.out.println("Directory not found.");
-                return "HAM DIRECTORY NOT FOUND! Please make sure the directory structure is correct.";
+                return "HAM DIRECTORY NOT FOUND! Please make sure the directory " +
+                        "structure is correct.";
             }
         }
 
@@ -159,22 +125,26 @@ public class Train {
         return out;
     }
 
+    /*
+     * Calculates the Bayesian probability that a given word is spam, based on the training
+     * data set.
+     */
     public HashMap<String,Double> bayes () {
 
-        HashMap<String,Double> bayesMap = new HashMap<String,Double>();
+        HashMap<String,Double> bayesMap = new HashMap<>();
 
-        double spamProb = 0.0;
-        double hamProb = 0.0;
+        double spamProb;
+        double hamProb;
 
         long start_time = System.currentTimeMillis();
 
-        for(String word : this.spamFreq.keySet()) {
-            spamProb = (this.spamFreq.get(word).doubleValue())/(spamFileCount);
+        for(String word : spamFreq.keySet()) {
+            spamProb = (spamFreq.get(word).doubleValue())/(spamFileCount);
 
-            if(this.hamFreq.get(word) == null) {
+            if(hamFreq.get(word) == null) {
                 hamProb = 0.0;
             } else {
-                hamProb = (this.hamFreq.get(word).doubleValue())/(hamFileCount);
+                hamProb = (hamFreq.get(word).doubleValue())/(hamFileCount);
             }
 
             double bayesProb = (spamProb)/(spamProb + hamProb);
@@ -186,15 +156,39 @@ public class Train {
         long end_time = System.currentTimeMillis();
         long total_time = end_time - start_time;
 
-        this.output = "Calculated probabilities for " + this.spamFreq.size() +" unique words in " + total_time + " ms.";
-        System.out.println(this.output);
+        output = "Calculated probabilities for " + spamFreq.size() +
+                " unique words in " + total_time + " ms.";
 
-        this.hamFreq = null;
-        this.spamFreq = null;
+        System.out.println(output);
+
+        hamFreq = null;
+        spamFreq = null;
 
         System.gc();
 
         return bayesMap;
+    }
+
+    /*
+     *  Creates a bag of words model from a given file
+     */
+    private HashMap<String,Integer> bagOfWords(File file) throws IOException {
+        HashMap<String, Integer> bagOfWords = new HashMap<>();
+        FileInputStream is = new FileInputStream(file);
+        InputStreamReader sr = new InputStreamReader(is, "UTF-8");
+        BufferedReader br = new BufferedReader(sr);
+        String line;
+
+        while ((line = br.readLine()) != null) {
+            for (String word : line.split(" ")) {
+                word = word.toLowerCase(); // force every word to lowercase
+                bagOfWords.putIfAbsent(word, 1);
+            }
+        }
+
+        br.close();
+
+        return bagOfWords;
     }
 
     public int getSpamFileCount() {
